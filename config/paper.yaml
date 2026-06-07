@@ -1,0 +1,17 @@
+environment: paper
+
+ibkr:
+  host: "127.0.0.1"
+  port: 7497
+  client_id: 1
+
+trading:
+  enabled: true
+  allowed_symbols:
+    - AAPL
+    - SPY
+    - QQQ
+  max_order_value: 200
+  max_daily_orders: 5
+  allow_short: false
+  allow_options: false

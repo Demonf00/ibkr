@@ -1,0 +1,16 @@
+environment: live
+
+ibkr:
+  host: "127.0.0.1"
+  port: 7496
+  client_id: 100
+
+trading:
+  enabled: false
+  require_manual_confirm: true
+  allowed_symbols:
+    - SPY
+  max_order_value: 50
+  max_daily_orders: 1
+  allow_short: false
+  allow_options: false
