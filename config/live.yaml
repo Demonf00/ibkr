@@ -1,12 +1,18 @@
 environment: live
 
+runtime:
+  loop_interval_seconds: 10
+  dry_run: true
+
 ibkr:
   host: "127.0.0.1"
   port: 7496
-  client_id: 100
+  client_id: 101
+  expected_account_prefix: "U"
 
 trading:
   enabled: false
+  allow_live_trading: false
   require_manual_confirm: true
   allowed_symbols:
     - SPY
@@ -14,3 +20,10 @@ trading:
   max_daily_orders: 1
   allow_short: false
   allow_options: false
+
+strategies:
+  - name: idle
+    enabled: true
+    weight: 1.0
+    symbols:
+      - SPY

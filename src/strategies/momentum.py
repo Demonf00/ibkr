@@ -2,15 +2,13 @@ from models import Signal, SignalAction
 from .base import StrategyBase
 
 
-class MaCrossStrategy(StrategyBase):
+class MomentumStrategy(StrategyBase):
     """
-    简单均线交叉策略：
+    Momentum 策略：
 
-    fast_ma 上穿 slow_ma：BUY
-    fast_ma 下穿 slow_ma：SELL
-    其他情况：HOLD
-
-    第一版只看最近两根 MA，用来判断是否刚刚发生 crossover。
+    如果最近 lookback 天涨幅 > buy_threshold，则 BUY
+    如果最近 lookback 天跌幅 < sell_threshold，则 SELL
+    否则 HOLD
     """
 
     def __init__(
@@ -18,19 +16,18 @@ class MaCrossStrategy(StrategyBase):
         name: str,
         symbols: list[str],
         weight: float = 1.0,
-        fast_ma: int = 10,
-        slow_ma: int = 30,
+        lookback: int = 20,
+        buy_threshold: float = 0.05,
+        sell_threshold: float = -0.05,
         quantity: int = 1,
         duration: str = "3 M",
         bar_size: str = "1 day",
     ):
         super().__init__(name=name, symbols=symbols, weight=weight)
 
-        if fast_ma >= slow_ma:
-            raise ValueError("fast_ma must be smaller than slow_ma")
-
-        self.fast_ma = fast_ma
-        self.slow_ma = slow_ma
+        self.lookback = lookback
+        self.buy_threshold = buy_threshold
+        self.sell_threshold = sell_threshold
         self.quantity = quantity
         self.duration = duration
         self.bar_size = bar_size
@@ -47,9 +44,9 @@ class MaCrossStrategy(StrategyBase):
                 )
 
                 if "close" not in df.columns:
-                    raise ValueError(f"No close column in historical data for {symbol}")
+                    raise ValueError(f"No close column for {symbol}")
 
-                if len(df) < self.slow_ma + 2:
+                if len(df) < self.lookback + 1:
                     signals.append(
                         Signal(
                             strategy_name=self.name,
@@ -57,55 +54,33 @@ class MaCrossStrategy(StrategyBase):
                             action=SignalAction.HOLD,
                             quantity=0,
                             confidence=0.0,
-                            reason=(
-                                f"Not enough bars for MA cross. "
-                                f"Need at least {self.slow_ma + 2}, got {len(df)}"
-                            ),
+                            reason=f"Not enough bars. Need {self.lookback + 1}, got {len(df)}",
                         )
                     )
                     continue
 
-                df = df.copy()
-                df["fast_ma"] = df["close"].rolling(self.fast_ma).mean()
-                df["slow_ma"] = df["close"].rolling(self.slow_ma).mean()
+                old_price = float(df["close"].iloc[-self.lookback - 1])
+                current_price = float(df["close"].iloc[-1])
 
-                prev = df.iloc[-2]
-                curr = df.iloc[-1]
+                ret = (current_price - old_price) / old_price
 
-                prev_fast = prev["fast_ma"]
-                prev_slow = prev["slow_ma"]
-                curr_fast = curr["fast_ma"]
-                curr_slow = curr["slow_ma"]
-
-                if prev_fast <= prev_slow and curr_fast > curr_slow:
+                if ret >= self.buy_threshold:
                     action = SignalAction.BUY
                     quantity = self.quantity
-                    confidence = 0.7
-                    reason = (
-                        f"MA bullish crossover: "
-                        f"fast({self.fast_ma}) {curr_fast:.2f} > "
-                        f"slow({self.slow_ma}) {curr_slow:.2f}"
-                    )
+                    confidence = min(abs(ret) / self.buy_threshold, 1.0)
+                    reason = f"Momentum BUY: {self.lookback}d return={ret:.2%}"
 
-                elif prev_fast >= prev_slow and curr_fast < curr_slow:
+                elif ret <= self.sell_threshold:
                     action = SignalAction.SELL
                     quantity = self.quantity
-                    confidence = 0.7
-                    reason = (
-                        f"MA bearish crossover: "
-                        f"fast({self.fast_ma}) {curr_fast:.2f} < "
-                        f"slow({self.slow_ma}) {curr_slow:.2f}"
-                    )
+                    confidence = min(abs(ret) / abs(self.sell_threshold), 1.0)
+                    reason = f"Momentum SELL: {self.lookback}d return={ret:.2%}"
 
                 else:
                     action = SignalAction.HOLD
                     quantity = 0
                     confidence = 0.0
-                    reason = (
-                        f"No crossover. "
-                        f"fast({self.fast_ma})={curr_fast:.2f}, "
-                        f"slow({self.slow_ma})={curr_slow:.2f}"
-                    )
+                    reason = f"Momentum HOLD: {self.lookback}d return={ret:.2%}"
 
                 signals.append(
                     Signal(
@@ -126,7 +101,7 @@ class MaCrossStrategy(StrategyBase):
                         action=SignalAction.HOLD,
                         quantity=0,
                         confidence=0.0,
-                        reason=f"MA cross error: {exc}",
+                        reason=f"Momentum error: {exc}",
                     )
                 )
 

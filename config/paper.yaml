@@ -1,17 +1,152 @@
 environment: paper
 
+runtime:
+  loop_interval_seconds: 300
+  dry_run: true
+
 ibkr:
-  host: "127.0.0.1"
-  port: 7497
-  client_id: 1
+  host: "${IBKR_HOST}"
+  port: "${IBKR_PORT}"
+  client_id: "${IBKR_CLIENT_ID}"
+  expected_account_prefix: "${IBKR_EXPECTED_ACCOUNT_PREFIX}"
+
+cost_model:
+  commission_per_share: 0.005
+  min_commission: 1.0
+  slippage_bps: 2.0
+
+aggregate:
+  enabled: true
+  buy_threshold: 0.35
+  sell_threshold: -0.35
+  default_quantity: 1
+  cost_gate_enabled: true
+  min_edge_buffer_bps: 5.0
 
 trading:
-  enabled: true
+  enabled: false
+  allow_live_trading: false
   allowed_symbols:
-    - AAPL
     - SPY
     - QQQ
-  max_order_value: 200
-  max_daily_orders: 5
+    - IWM
+    - TLT
+    - GLD
+    - XLK
+    - XLV
+    - XLF
+    - XLE
+    - XLU
+  max_order_value: 1000
+  max_daily_orders: 3
   allow_short: false
   allow_options: false
+
+strategy_limits:
+  ma_cross:
+    max_daily_orders: 3
+  momentum:
+    max_daily_orders: 3
+  mean_reversion:
+    max_daily_orders: 3
+  breakout:
+    max_daily_orders: 3
+  quality_trend_rotation:
+    max_daily_orders: 2
+
+strategies:
+  - name: ma_cross
+    enabled: true
+    weight: 0.15
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - TLT
+      - GLD
+    params:
+      fast_ma: 20
+      slow_ma: 50
+      quantity: 1
+      duration: "1 Y"
+      bar_size: "1 day"
+
+  - name: momentum
+    enabled: true
+    weight: 0.20
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - TLT
+      - GLD
+      - XLK
+      - XLV
+      - XLF
+      - XLE
+      - XLU
+    params:
+      lookback: 63
+      buy_threshold: 0.06
+      sell_threshold: -0.06
+      quantity: 1
+      duration: "1 Y"
+      bar_size: "1 day"
+
+  - name: mean_reversion
+    enabled: true
+    weight: 0.10
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - TLT
+      - GLD
+    params:
+      ma_window: 20
+      buy_deviation: -0.04
+      sell_deviation: 0.05
+      quantity: 1
+      duration: "6 M"
+      bar_size: "1 day"
+
+  - name: breakout
+    enabled: true
+    weight: 0.15
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - TLT
+      - GLD
+    params:
+      lookback: 55
+      quantity: 1
+      duration: "1 Y"
+      bar_size: "1 day"
+
+  - name: quality_trend_rotation
+    enabled: true
+    weight: 0.40
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - TLT
+      - GLD
+      - XLK
+      - XLV
+      - XLF
+      - XLE
+      - XLU
+    params:
+      top_n: 2
+      fast_lookback: 63
+      slow_lookback: 126
+      long_ma: 200
+      vol_window: 20
+      volatility_penalty: 0.5
+      min_score: 0.02
+      quantity: 1
+      duration: "1 Y"
+      bar_size: "1 day"

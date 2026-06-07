@@ -2,15 +2,13 @@ from models import Signal, SignalAction
 from .base import StrategyBase
 
 
-class MaCrossStrategy(StrategyBase):
+class MeanReversionStrategy(StrategyBase):
     """
-    简单均线交叉策略：
+    Mean Reversion 策略：
 
-    fast_ma 上穿 slow_ma：BUY
-    fast_ma 下穿 slow_ma：SELL
-    其他情况：HOLD
-
-    第一版只看最近两根 MA，用来判断是否刚刚发生 crossover。
+    当前价格低于 moving average 一定比例 → BUY
+    当前价格高于 moving average 一定比例 → SELL
+    否则 HOLD
     """
 
     def __init__(
@@ -18,19 +16,18 @@ class MaCrossStrategy(StrategyBase):
         name: str,
         symbols: list[str],
         weight: float = 1.0,
-        fast_ma: int = 10,
-        slow_ma: int = 30,
+        ma_window: int = 20,
+        buy_deviation: float = -0.03,
+        sell_deviation: float = 0.03,
         quantity: int = 1,
         duration: str = "3 M",
         bar_size: str = "1 day",
     ):
         super().__init__(name=name, symbols=symbols, weight=weight)
 
-        if fast_ma >= slow_ma:
-            raise ValueError("fast_ma must be smaller than slow_ma")
-
-        self.fast_ma = fast_ma
-        self.slow_ma = slow_ma
+        self.ma_window = ma_window
+        self.buy_deviation = buy_deviation
+        self.sell_deviation = sell_deviation
         self.quantity = quantity
         self.duration = duration
         self.bar_size = bar_size
@@ -47,9 +44,9 @@ class MaCrossStrategy(StrategyBase):
                 )
 
                 if "close" not in df.columns:
-                    raise ValueError(f"No close column in historical data for {symbol}")
+                    raise ValueError(f"No close column for {symbol}")
 
-                if len(df) < self.slow_ma + 2:
+                if len(df) < self.ma_window:
                     signals.append(
                         Signal(
                             strategy_name=self.name,
@@ -57,44 +54,32 @@ class MaCrossStrategy(StrategyBase):
                             action=SignalAction.HOLD,
                             quantity=0,
                             confidence=0.0,
-                            reason=(
-                                f"Not enough bars for MA cross. "
-                                f"Need at least {self.slow_ma + 2}, got {len(df)}"
-                            ),
+                            reason=f"Not enough bars. Need {self.ma_window}, got {len(df)}",
                         )
                     )
                     continue
 
-                df = df.copy()
-                df["fast_ma"] = df["close"].rolling(self.fast_ma).mean()
-                df["slow_ma"] = df["close"].rolling(self.slow_ma).mean()
+                current_price = float(df["close"].iloc[-1])
+                ma = float(df["close"].rolling(self.ma_window).mean().iloc[-1])
 
-                prev = df.iloc[-2]
-                curr = df.iloc[-1]
+                deviation = (current_price - ma) / ma
 
-                prev_fast = prev["fast_ma"]
-                prev_slow = prev["slow_ma"]
-                curr_fast = curr["fast_ma"]
-                curr_slow = curr["slow_ma"]
-
-                if prev_fast <= prev_slow and curr_fast > curr_slow:
+                if deviation <= self.buy_deviation:
                     action = SignalAction.BUY
                     quantity = self.quantity
-                    confidence = 0.7
+                    confidence = min(abs(deviation) / abs(self.buy_deviation), 1.0)
                     reason = (
-                        f"MA bullish crossover: "
-                        f"fast({self.fast_ma}) {curr_fast:.2f} > "
-                        f"slow({self.slow_ma}) {curr_slow:.2f}"
+                        f"MeanReversion BUY: price={current_price:.2f}, "
+                        f"MA({self.ma_window})={ma:.2f}, deviation={deviation:.2%}"
                     )
 
-                elif prev_fast >= prev_slow and curr_fast < curr_slow:
+                elif deviation >= self.sell_deviation:
                     action = SignalAction.SELL
                     quantity = self.quantity
-                    confidence = 0.7
+                    confidence = min(abs(deviation) / abs(self.sell_deviation), 1.0)
                     reason = (
-                        f"MA bearish crossover: "
-                        f"fast({self.fast_ma}) {curr_fast:.2f} < "
-                        f"slow({self.slow_ma}) {curr_slow:.2f}"
+                        f"MeanReversion SELL: price={current_price:.2f}, "
+                        f"MA({self.ma_window})={ma:.2f}, deviation={deviation:.2%}"
                     )
 
                 else:
@@ -102,9 +87,8 @@ class MaCrossStrategy(StrategyBase):
                     quantity = 0
                     confidence = 0.0
                     reason = (
-                        f"No crossover. "
-                        f"fast({self.fast_ma})={curr_fast:.2f}, "
-                        f"slow({self.slow_ma})={curr_slow:.2f}"
+                        f"MeanReversion HOLD: price={current_price:.2f}, "
+                        f"MA({self.ma_window})={ma:.2f}, deviation={deviation:.2%}"
                     )
 
                 signals.append(
@@ -126,7 +110,7 @@ class MaCrossStrategy(StrategyBase):
                         action=SignalAction.HOLD,
                         quantity=0,
                         confidence=0.0,
-                        reason=f"MA cross error: {exc}",
+                        reason=f"MeanReversion error: {exc}",
                     )
                 )
 
