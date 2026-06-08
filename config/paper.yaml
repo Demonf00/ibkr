@@ -53,6 +53,8 @@ strategy_limits:
     max_daily_orders: 3
   quality_trend_rotation:
     max_daily_orders: 2
+  volatility_reversion:
+    max_daily_orders: 3
 
 strategies:
   - name: ma_cross
@@ -149,4 +151,22 @@ strategies:
       min_score: 0.02
       quantity: 1
       duration: "1 Y"
+      bar_size: "1 day"
+
+  - name: volatility_reversion
+    enabled: true
+    weight: 0.35  # 给予较高的权重抗衡趋势策略
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - TLT
+      - GLD
+      - XLK
+    params:
+      window: 20
+      std_dev: 2.5
+      atr_window: 14
+      quantity: 1
+      duration: "6 M"
       bar_size: "1 day"

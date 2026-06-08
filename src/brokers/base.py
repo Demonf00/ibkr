@@ -32,3 +32,7 @@ class BrokerBase(ABC):
     @abstractmethod
     def place_market_order(self, symbol: str, side: str, quantity: int) -> Any:
         pass
+    
+    @abstractmethod
+    def get_position(self, symbol: str) -> int:
+        pass

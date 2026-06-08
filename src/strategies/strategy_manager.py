@@ -4,6 +4,7 @@ from .momentum import MomentumStrategy
 from .mean_reversion import MeanReversionStrategy
 from .breakout import BreakoutStrategy
 from .quality_trend_rotation import QualityTrendRotationStrategy
+from .volatility_reversion import VolatilityReversionStrategy
 
 
 class StrategyManager:
@@ -100,6 +101,21 @@ class StrategyManager:
                         min_score=float(params.get("min_score", 0.02)),
                         quantity=int(params.get("quantity", 1)),
                         duration=params.get("duration", "1 Y"),
+                        bar_size=params.get("bar_size", "1 day"),
+                    )
+                )
+
+            elif name == "volatility_reversion":
+                self.strategies.append(
+                    VolatilityReversionStrategy(
+                        name=name,
+                        symbols=symbols,
+                        weight=weight,
+                        window=int(params.get("window", 20)),
+                        std_dev=float(params.get("std_dev", 2.5)),
+                        atr_window=int(params.get("atr_window", 14)),
+                        quantity=int(params.get("quantity", 1)),
+                        duration=params.get("duration", "6 M"),
                         bar_size=params.get("bar_size", "1 day"),
                     )
                 )

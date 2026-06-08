@@ -26,7 +26,7 @@ class OrderManager:
 
         price = self.broker.get_market_price(order.symbol)
 
-        self.risk_manager.validate_order(order, price)
+        self.risk_manager.validate_order(order, price, self.broker)
 
         if self.dry_run:
             print(

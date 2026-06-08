@@ -22,7 +22,8 @@ class RiskManager:
             )
         )
 
-    def validate_order(self, order: OrderRequest, price: float) -> None:
+    # 注意方法签名增加了 broker 参数
+    def validate_order(self, order: OrderRequest, price: float, broker) -> None:
         trading = self.config["trading"]
 
         if not trading.get("enabled", False):
@@ -34,8 +35,14 @@ class RiskManager:
         if order.quantity <= 0:
             raise RuntimeError("Quantity must be positive.")
 
+        # 核心修复：检查是平仓还是裸做空
         if order.side == SignalAction.SELL and not trading.get("allow_short", False):
-            raise RuntimeError("Short selling is disabled.")
+            current_position = broker.get_position(order.symbol)
+            if current_position < order.quantity:
+                raise RuntimeError(
+                    f"Short selling is disabled. Attempted to sell {order.quantity} "
+                    f"but only holding {current_position} of {order.symbol}."
+                )
 
         order_value = order.quantity * price
 

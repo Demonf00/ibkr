@@ -1,4 +1,6 @@
+import os
 import pandas as pd
+import yfinance as yf
 
 from .base import BrokerBase
 
@@ -8,54 +10,68 @@ class MockBroker(BrokerBase):
         self.cash = 100000.0
         self.positions = {}
         self.orders = []
+        # 本地缓存，避免重复下载
+        self._history_cache = {}
 
     def connect(self) -> None:
-        print("[MockBroker] connected")
+        print("[MockBroker] connected (using yfinance for real historical data)")
 
     def disconnect(self) -> None:
         print("[MockBroker] disconnected")
 
     def get_accounts(self) -> list[str]:
         return ["DU_MOCK_ACCOUNT"]
+        
+    def get_position(self, symbol: str) -> int:
+        return self.positions.get(symbol, 0)
 
     def get_market_price(self, symbol: str) -> float:
-        fake_prices = {
-            "AAPL": 200.0,
-            "SPY": 500.0,
-            "QQQ": 430.0,
-        }
-        return fake_prices.get(symbol, 100.0)
+        # 如果缓存里有，直接取最后一天收盘价
+        if symbol in self._history_cache:
+            return float(self._history_cache[symbol]["close"].iloc[-1])
+        
+        # 否则去 yfinance 拿最新价
+        ticker = yf.Ticker(symbol)
+        todays_data = ticker.history(period="1d")
+        if not todays_data.empty:
+            return float(todays_data["Close"].iloc[-1])
+        return 100.0
 
     def get_historical_bars(
         self,
         symbol: str,
-        duration: str = "3 M",
-        bar_size: str = "1 day",
+        duration: str = "1 y", # 默认给够 1 年数据，满足 200ma
+        bar_size: str = "1d",
     ) -> pd.DataFrame:
-        # 生成一段假的上涨价格，用来测试 MA cross 流程
-        dates = pd.date_range(end=pd.Timestamp.today(), periods=80, freq="D")
+        
+        # 简单转换 IBKR 的 duration 到 yfinance 的 period
+        period_map = {
+            "1 m": "1mo", "3 m": "3mo", "6 m": "6mo", 
+            "1 y": "1y", "2 y": "2y", "5 y": "5y"
+        }
+        yf_period = period_map.get(duration.lower(), "1y")
 
-        base = self.get_market_price(symbol)
+        cache_key = f"{symbol}_{yf_period}"
+        if cache_key in self._history_cache:
+            return self._history_cache[cache_key]
 
-        closes = []
-        for i in range(len(dates)):
-            # 前半段慢涨，后半段加速上涨，让短均线可能上穿长均线
-            if i < 40:
-                closes.append(base - 20 + i * 0.2)
-            else:
-                closes.append(base - 12 + i * 0.5)
+        print(f"[MockBroker] Downloading real data for {symbol} ({yf_period})...")
+        ticker = yf.Ticker(symbol)
+        df = ticker.history(period=yf_period)
 
-        df = pd.DataFrame(
-            {
-                "date": dates,
-                "open": closes,
-                "high": [c * 1.01 for c in closes],
-                "low": [c * 0.99 for c in closes],
-                "close": closes,
-                "volume": [1000000] * len(dates),
-            }
-        )
+        if df.empty:
+            raise ValueError(f"No historical bars returned from yfinance for {symbol}")
 
+        # 标准化列名为小写，适配你的策略
+        df = df.rename(columns={
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume"
+        })
+        
+        self._history_cache[cache_key] = df
         return df
 
     def place_market_order(self, symbol: str, side: str, quantity: int):
