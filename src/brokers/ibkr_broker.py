@@ -37,6 +37,8 @@ class IbkrBroker(BrokerBase):
                     f"Account safety check failed. "
                     f"Expected prefix={self.expected_account_prefix}, got={accounts}"
                 )
+        
+        self.ib.reqMarketDataType(3) # 3 代表 Delayed (延时数据)
 
     def disconnect(self) -> None:
         if self.ib.isConnected():

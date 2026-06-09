@@ -1,8 +1,8 @@
 environment: paper
 
 runtime:
-  loop_interval_seconds: 300
-  dry_run: true
+  loop_interval_seconds: 10
+  dry_run: false
 
 ibkr:
   host: "${IBKR_HOST}"
@@ -24,8 +24,8 @@ aggregate:
   min_edge_buffer_bps: 5.0
 
 trading:
-  enabled: false
-  allow_live_trading: false
+  enabled: true
+  allow_live_trading: true
   allowed_symbols:
     - SPY
     - QQQ
@@ -37,24 +37,24 @@ trading:
     - XLF
     - XLE
     - XLU
-  max_order_value: 1000
-  max_daily_orders: 3
-  allow_short: false
-  allow_options: false
+  max_order_value: 10000
+  max_daily_orders: 30
+  allow_short: true
+  allow_options: true
 
 strategy_limits:
   ma_cross:
-    max_daily_orders: 3
+    max_daily_orders: 30
   momentum:
-    max_daily_orders: 3
+    max_daily_orders: 30
   mean_reversion:
-    max_daily_orders: 3
+    max_daily_orders: 30
   breakout:
-    max_daily_orders: 3
+    max_daily_orders: 30
   quality_trend_rotation:
-    max_daily_orders: 2
+    max_daily_orders: 20
   volatility_reversion:
-    max_daily_orders: 3
+    max_daily_orders: 30
 
 strategies:
   - name: ma_cross
